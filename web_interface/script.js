@@ -1,6 +1,10 @@
 // Fantasy Chatbot Web Interface
 
-const API_BASE = 'http://localhost:8000/api';
+// Get API base URL from query parameter or use default
+const urlParams = new URLSearchParams(window.location.search);
+const API_BASE = urlParams.get('api_url') || 'http://localhost:8000/api';
+console.log('API_BASE:', API_BASE);
+console.log('URL params:', urlParams.toString());
 
 // DOM Elements
 const chatForm = document.getElementById('chat-form');
@@ -9,6 +13,8 @@ const sendButton = document.getElementById('send-button');
 const chatMessages = document.getElementById('chat-messages');
 const typingIndicator = document.getElementById('typing-indicator');
 const universeSelect = document.getElementById('universe-select');
+const apiUrlInput = document.getElementById('api-url-input');
+const saveApiUrlButton = document.getElementById('save-api-url');
 
 // Conversation state
 let conversationId = null;
@@ -117,17 +123,36 @@ messageInput.addEventListener('input', () => {
     sendButton.disabled = !messageInput.value.trim();
 });
 
+// Save API URL button
+saveApiUrlButton.addEventListener('click', () => {
+    const newApiUrl = apiUrlInput.value.trim();
+    if (newApiUrl) {
+        // Update API_BASE
+        API_BASE = newApiUrl + '/api';
+        // Update URL without reloading
+        const url = new URL(window.location);
+        url.searchParams.set('api_url', API_BASE);
+        window.history.pushState({}, '', url);
+        // Re-fetch universes
+        fetchUniverses();
+    }
+});
+
 // Focus input on load
 messageInput.focus();
 
 // Fetch universes from API
 async function fetchUniverses() {
+    console.log('Fetching universes from:', `${API_BASE}/universes`);
     try {
         const response = await fetch(`${API_BASE}/universes`);
+        console.log('Response status:', response.status);
         const data = await response.json();
+        console.log('Response data:', data);
 
         if (response.ok && data.topics) {
             availableUniverses = data.topics;
+            console.log('Available universes:', availableUniverses);
             populateUniverseDropdown(availableUniverses);
         } else {
             console.error('Failed to fetch universes:', data);
@@ -167,11 +192,6 @@ function updateFooter(universes) {
     }
 }
 
-// Enable/disable send button based on input
-messageInput.addEventListener('input', () => {
-    sendButton.disabled = !messageInput.value.trim();
-});
-
 // Handle universe selection change
 universeSelect.addEventListener('change', (e) => {
     currentUniverse = e.target.value;
@@ -193,5 +213,10 @@ async function checkHealth() {
 }
 
 // Initialize
+// Set the API URL input field value
+apiUrlInput.value = API_BASE.replace('/api', '');
+// Reconstruct API_BASE without /api suffix for the input
+API_BASE = API_BASE.replace('/api', '');
+
 fetchUniverses();
 checkHealth();

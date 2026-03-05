@@ -27,8 +27,8 @@ universes:
 
 # LLM Configuration
 llm:
-  # OpenAI-compatible API endpoint
-  api_url: "http://192.168.1.183:1234/v1/chat/completions"
+  # OpenAI-compatible API endpoint (base URL, SDK will add /chat/completions)
+  api_url: "http://192.168.1.183:1234/v1"
   # Model name
   model: "local-model"
   # Temperature for response generation (0.0-2.0)

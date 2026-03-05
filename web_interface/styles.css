@@ -47,6 +47,56 @@ header h1 {
     font-size: 1rem;
 }
 
+.api-config {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.api-config label {
+    color: #a0a0a0;
+    font-size: 0.9rem;
+}
+
+.api-config input {
+    padding: 8px 12px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.3s ease;
+    width: 250px;
+}
+
+.api-config input:focus {
+    border-color: #e94560;
+}
+
+.api-config input::placeholder {
+    color: #a0a0a0;
+}
+
+.api-config button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #e94560, #ff6b6b);
+    color: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.api-config button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+}
+
 .chat-container {
     display: flex;
     flex-direction: column;
@@ -110,6 +160,23 @@ header h1 {
     border-radius: 18px 18px 18px 4px;
     max-width: 80%;
     align-self: flex-start;
+    word-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.user-message .message-content {
+    background: linear-gradient(135deg, #e94560, #ff6b6b);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 18px 18px 4px 18px;
+    max-width: 80%;
+    align-self: flex-end;
+    word-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.6;
+    white-space: pre-wrap;
 }
 
 .typing-indicator {

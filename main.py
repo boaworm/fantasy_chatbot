@@ -35,20 +35,23 @@ llm_config = config['llm']
 server_config = config['server']
 validation_config = config['validation']
 
-universe_context = UniverseContext(universes=universes, llm_runner=llm_runner)
-
-topic_validator = TopicValidator(
-    topics=[universe['name'] for universe in universes],
-    threshold=validation_config['similarity_threshold'],
-    use_fuzzy=validation_config['use_fuzzy_matching']
-)
-
+# Create LLM runner first (needed by UniverseContext)
 llm_runner = LLMRunner(
     api_url=llm_config['api_url'],
     model=llm_config['model'],
     temperature=llm_config['temperature'],
     max_tokens=llm_config['max_tokens'],
     system_prompt=llm_config['system_prompt']
+)
+
+# Create UniverseContext with the LLM runner
+universe_context = UniverseContext(universes=universes, llm_runner=llm_runner)
+
+# Create topic validator
+topic_validator = TopicValidator(
+    topics=[universe['name'] for universe in universes],
+    threshold=validation_config['similarity_threshold'],
+    use_fuzzy=validation_config['use_fuzzy_matching']
 )
 
 # Create a separate LLM runner for topic validation with a different system prompt
@@ -105,6 +108,61 @@ class TopicResponse(BaseModel):
 conversations: dict[str, list] = {}
 
 
+def clean_llm_response(response: str) -> str:
+    """
+    Clean LLM response by removing analysis steps and formatting.
+
+    Args:
+        response: Raw LLM response
+
+    Returns:
+        Cleaned response with just the answer
+    """
+    import re
+
+    # Remove markdown headers (##, ###, etc.)
+    response = re.sub(r'^#+\s+', '', response, flags=re.MULTILINE)
+
+    # Remove bold markers (**text**)
+    response = re.sub(r'\*\*(.*?)\*\*', r'\1', response)
+
+    # Remove italic markers (*text*)
+    response = re.sub(r'\*(.*?)\*', r'\1', response)
+
+    # Remove bullet points and numbered lists
+    response = re.sub(r'^[\*\-\d]+\.\s+', '', response, flags=re.MULTILINE)
+
+    # Remove "Analyze the Request" section (more robust pattern)
+    response = re.sub(r'Analyze the Request:.*?(?=Identify Key Information Needed:|Identify Key Information:|Identify Key:|$)', '', response, flags=re.DOTALL)
+
+    # Remove "Identify Key Information" section (more robust pattern)
+    response = re.sub(r'Identify Key Information Needed:.*?(?=Structure the answer:|Structure the answer:|Structure the answer:|$)', '', response, flags=re.DOTALL)
+
+    # Remove "Identify Key Information" section (alternative pattern)
+    response = re.sub(r'Identify Key Information:.*?(?=Structure the answer:|Structure the answer:|Structure the answer:|$)', '', response, flags=re.DOTALL)
+
+    # Remove "Identify Key" section (alternative pattern)
+    response = re.sub(r'Identify Key:.*?(?=Structure the answer:|Structure the answer:|Structure the answer:|$)', '', response, flags=re.DOTALL)
+
+    # Remove "Structure the answer" section (more robust pattern)
+    response = re.sub(r'Structure the answer:.*?(?=Drafting the content:|Drafting the content:|Drafting the content:|$)', '', response, flags=re.DOTALL)
+
+    # Remove "Drafting the content" section (more robust pattern)
+    response = re.sub(r'Drafting the content:.*?(?=Answer:|Answer:|Answer:|$)', '', response, flags=re.DOTALL)
+
+    # Remove "Drafting the content" section (alternative pattern)
+    response = re.sub(r'Drafting the content.*?(?=Answer:|Answer:|Answer:|$)', '', response, flags=re.DOTALL)
+
+    # Remove "Answer:" prefix if present
+    response = re.sub(r'^Answer:\s*', '', response, flags=re.MULTILINE)
+
+    # Remove extra whitespace and newlines
+    response = re.sub(r'\n\s*\n+', '\n\n', response)
+    response = response.strip()
+
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
 async def get_web_interface():
     """Serve the web interface."""
@@ -154,7 +212,7 @@ async def chat(request: ChatRequest):
 
     if not is_on_topic:
         return ChatResponse(
-            response=f"I'm sorry, but I can only discuss topics related to {request.universe}. {reason}",
+            response="Sorry",
             is_on_topic=False,
             reason=reason
         )
@@ -173,9 +231,12 @@ async def chat(request: ChatRequest):
             conversation_history=conversations[request.conversation_id]
         )
 
+        # Clean the response to remove analysis steps and formatting
+        cleaned_response = clean_llm_response(llm_response.content)
+
         # Validate LLM response
         is_response_valid, response_reason = topic_validator.validate_response(
-            llm_response.content,
+            cleaned_response,
             rewritten_query
         )
 
@@ -186,12 +247,12 @@ async def chat(request: ChatRequest):
                 reason=response_reason
             )
 
-        # Update conversation history
+        # Update conversation history with cleaned response
         conversations[request.conversation_id].append(
             {"role": "user", "content": request.message}
         )
         conversations[request.conversation_id].append(
-            {"role": "assistant", "content": llm_response.content}
+            {"role": "assistant", "content": cleaned_response}
         )
 
         # Keep conversation history manageable
@@ -199,7 +260,7 @@ async def chat(request: ChatRequest):
             conversations[request.conversation_id] = conversations[request.conversation_id][-10:]
 
         return ChatResponse(
-            response=llm_response.content,
+            response=cleaned_response,
             is_on_topic=True,
             reason="Response is valid and on-topic",
             conversation_id=request.conversation_id

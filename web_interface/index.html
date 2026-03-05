@@ -11,6 +11,11 @@
         <header>
             <h1>🐉 Fantasy Chatbot</h1>
             <p class="subtitle">Chat about fantasy literature and role-playing games</p>
+            <div class="api-config">
+                <label for="api-url-input">API URL:</label>
+                <input type="text" id="api-url-input" placeholder="http://localhost:8000/api">
+                <button id="save-api-url">Save</button>
+            </div>
         </header>
 
         <div class="chat-container">
@@ -59,10 +64,6 @@
             <p id="footer-universes">Loading universes...</p>
         </footer>
     </div>
-
-    <footer id="main-footer">
-        <!-- Footer content will be populated by JavaScript -->
-    </footer>
 
 <script src="/static/script.js"></script>
 </body>

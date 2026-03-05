@@ -99,7 +99,11 @@ class UniverseContext:
 
         Returns:
             Rewritten query with universe context
-        """
+            The answer may only contain places, names, characters and events from the selected universe.
+            If the question is generic, such as "What is a dragon?", the answer may include information about dragons from this universet
+            If the question is generic, such as "Tell me about a famous character", the answer may include information about a famous character from this universe, but not a generic character that is not related to the universe.      
+                
+          """
         if not self.current_universe:
             return query
 
@@ -189,17 +193,21 @@ Universe keywords: {keywords}
 
 User question: "{query}"
 
-Analyze the question and determine:
-1. Is this question related to the fantasy universe above?
-2. Is this question, or any subject mentioned in it, commonly associated with the universe based on the keywords or general knowledge of the universe?
-3. Is this a generic question that could apply to this universe (like "tell me about a big country")?
+Analyze the question and determine if it can be answered in the context of the fantasy universe above.
+Return ONLY a JSON object with a single boolean field "is_related" (true or false).
+Do not include any explanation or filler words.
 
-Return your answer in JSON format:
-{{
-    "is_related": true/false,
-    "reason": "brief explanation (e.g., 'Yes, Aragorn is a character in Lord of the Rings' or 'No, this is a general question')",
-    "is_generic": true/false
-}}"""
+Example 1: Lord of the Rings Universe. Question: "Who is the Dark Lord in this universe?" -> {{"is_related": true}}
+Example 2: Lord of the Rings Universe. Question: "What is the capital of France?" -> {{"is_related": false}}    
+Example 3: Belgariad Universe. Question: "Who is the main antagonist in this universe?" -> {{"is_related": true}}
+Example 4: Belgariad Universe. Question: "What is the tallest mountain in the world?" -> {{"is_related": true}}
+Example 5: Lord of the Rings Universe. Question: Tell me about the Green Dragon. -> {{"is_related": true}}    
+Example 6: Lord of the Rings Universe. Question: Tell me about a famous Green Dragon. -> {{"is_related": false}}    
+Example 7: Dungeons & Dragons Universe. Question: Tell me about a famous Green Dragon. -> {{"is_related": true}}    
+
+Response format:
+
+{{"is_related": true}}"""
 
         try:
             response = self.llm_runner.generate_response(
@@ -215,12 +223,19 @@ Return your answer in JSON format:
             json_match = re.search(r'\{[^{}]*"is_related"[^{}]*\}', response.content)
             if json_match:
                 result = json.loads(json_match.group())
-                return result["is_related"], result["reason"]
+                is_related = result.get("is_related", False)
+                reason = "Topic is related to the universe" if is_related else "Topic is not related to the universe"
+                return is_related, reason
             else:
                 # If we can't parse JSON, assume it's related
                 logger.warning(f"Could not parse LLM response as JSON: {response.content}")
                 return True, "Topic appears to be related"
 
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error: {e}")
+            # If we can't parse JSON, assume it's related to avoid false negatives
+            return True, "Topic appears to be related"
         except Exception as e:
             logger.error(f"Error checking topic with LLM: {e}")
-            return False, f"Error validating topic: {str(e)}"
+            # For any other error, assume it's related to avoid false negatives
+            return True, "Topic appears to be related"

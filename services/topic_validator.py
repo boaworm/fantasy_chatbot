@@ -102,9 +102,13 @@ class TopicValidator:
         if len(response_lower) < 10:
             return False, "Response is too short to be meaningful"
 
-        # Check for conversational filler
+        # Check for conversational filler - be more lenient
+        # Only flag filler if it's the majority of the response
         filler_words = {"um", "uh", "ah", "like", "you know"}
-        if any(word in response_lower for word in filler_words):
-            return False, "Response contains conversational filler"
+        filler_count = sum(1 for word in filler_words if word in response_lower)
+        total_words = len(response_lower.split())
+
+        if filler_count > total_words * 0.3:  # More than 30% filler words
+            return False, "Response contains too much conversational filler"
 
         return True, "Response is valid and on-topic"

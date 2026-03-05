@@ -1,0 +1,3 @@
+export ANTHROPIC_AUTH_TOKEN="lmstudio"
+export ANTHROPIC_BASE_URL="http://192.168.1.183:1234"
+
