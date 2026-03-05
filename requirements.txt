@@ -1,0 +1,15 @@
+# Web Framework & Server
+fastapi>=0.135.1
+uvicorn[standard]>=0.41.0
+
+# Data Validation (Crucial for Python 3.13)
+pydantic>=2.12.5
+pydantic-settings>=2.13.1
+
+# AI & Orchestration
+openai>=1.65.0
+langgraph>=0.4.14
+
+# Utilities
+python-dotenv>=1.2.2
+aiohttp>=3.13.3

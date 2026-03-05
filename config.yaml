@@ -1,0 +1,54 @@
+# Configuration for Fantasy Chatbot Layer
+
+# List of allowed universes with their keywords
+universes:
+  - name: "Lord of the Rings"
+    keywords:
+      - Hobbits
+      - Elven Rings
+      - Sauron
+      - Middle-earth
+      - Fellowship
+  - name: "The Belgariad"
+    keywords:
+      - Belgarath
+      - Polgara
+      - Garion
+      - Aldur
+      - Riva  
+  - name: "Dungeons & Dragons"
+    keywords:
+      - Dungeons
+      - Dragons
+      - Wizards
+      - Monsters
+      - Adventures
+      - Forgotten Realms
+
+# LLM Configuration
+llm:
+  # OpenAI-compatible API endpoint
+  api_url: "http://192.168.1.183:1234/v1/chat/completions"
+  # Model name
+  model: "local-model"
+  # Temperature for response generation (0.0-2.0)
+  temperature: 0.7
+  # Maximum tokens in response
+  max_tokens: 500
+  # System prompt for the LLM
+  system_prompt: "You are a helpful assistant specializing in fantasy literature and role-playing games. Answer questions about the topics listed in your system instructions."
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+
+# Topic Validation
+validation:
+  # Minimum similarity threshold (0.0-1.0)
+  similarity_threshold: 0.6
+  # Whether to use fuzzy matching for topic validation
+  use_fuzzy_matching: true
+  # System prompt for topic validation
+  topic_validation_prompt: "You are a topic validator for a fantasy chatbot. Your task is to determine if a user's question is related to a specific fantasy universe. Return your answer in JSON format: {\"is_related\": true/false, \"reason\": \"brief explanation\", \"is_generic\": true/false}"
