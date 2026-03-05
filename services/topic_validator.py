@@ -3,112 +3,72 @@ Topic validation service for fantasy chatbot.
 Ensures user questions and AI responses stay within configured topics.
 """
 
-from typing import List, Optional
-from difflib import SequenceMatcher
-import re
+from typing import List, Optional, Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TopicValidator:
-    """Validates that text is related to configured topics."""
+    """Validates that AI responses are related to configured universes using an LLM."""
 
-    def __init__(self, topics: List[str], threshold: float = 0.6, use_fuzzy: bool = True):
+    def __init__(self, universes: List[Dict], llm_runner=None):
         """
-        Initialize the topic validator.
+        Initialize the topic validator with an LLM.
 
         Args:
-            topics: List of allowed topic strings
-            threshold: Minimum similarity threshold (0.0-1.0)
-            use_fuzzy: Whether to use fuzzy matching
+            universes: List of universe configs
+            llm_runner: LLM runner for validation
         """
-        self.topics = [topic.strip().lower() for topic in topics]
-        self.threshold = threshold
-        self.use_fuzzy = use_fuzzy
-
-    def is_on_topic(self, text: str) -> tuple[bool, Optional[str]]:
-        """
-        Check if text is related to any configured topic.
-
-        Args:
-            text: Text to validate
-
-        Returns:
-            Tuple of (is_on_topic, reason)
-        """
-        if not text or not text.strip():
-            return False, "Empty message"
-
-        text_lower = text.strip().lower()
-
-        # Check for exact topic matches
-        for topic in self.topics:
-            if topic in text_lower:
-                return True, f"Related to: {topic.title()}"
-
-        # Check for fuzzy matches
-        if self.use_fuzzy:
-            for topic in self.topics:
-                similarity = self._calculate_similarity(text_lower, topic)
-                if similarity >= self.threshold:
-                    return True, f"Related to: {topic.title()} (similarity: {similarity:.2f})"
-
-        return False, "Not related to configured topics"
-
-    def _calculate_similarity(self, text: str, topic: str) -> float:
-        """
-        Calculate similarity between text and topic using sequence matching.
-
-        Args:
-            text: Text to compare
-            topic: Topic to compare against
-
-        Returns:
-            Similarity score (0.0-1.0)
-        """
-        # Try to find common words
-        text_words = set(re.findall(r'\b\w+\b', text))
-        topic_words = set(re.findall(r'\b\w+\b', topic))
-
-        # Calculate Jaccard similarity
-        intersection = text_words & topic_words
-        union = text_words | topic_words
-
-        if not union:
-            return 0.0
-
-        return len(intersection) / len(union)
+        self.universes = universes
+        self.llm_runner = llm_runner
 
     def validate_response(self, response: str, user_message: str) -> tuple[bool, Optional[str]]:
         """
-        Validate that an AI response is on-topic.
+        Validate that an AI response is on-topic and appropriate using the LLM.
 
         Args:
             response: AI response to validate
-            user_message: Original user message
+            user_message: Original user message (which includes the universe framing)
 
         Returns:
             Tuple of (is_valid, reason)
         """
-        # Check if response is on-topic
-        is_on_topic, reason = self.is_on_topic(response)
+        if not self.llm_runner:
+            # Fallback if no LLM provided: just allow it through
+            return True, "No LLM provided for validation"
 
-        if not is_on_topic:
-            return False, f"Response is off-topic: {reason}"
+        prompt = f"""You are a strict response validator for a fantasy chatbot.
 
-        # Check if response is directly related to user's question
-        response_lower = response.lower()
-        user_lower = user_message.lower()
+User asked: "{user_message}"
+Chatbot responded: "{response}"
 
-        # Ensure response addresses the user's question
-        if len(response_lower) < 10:
-            return False, "Response is too short to be meaningful"
+Evaluate the chatbot's response. Does the response stay entirely within the requested fantasy universe?
+Does it avoid mentioning real-world concepts or other unrelated franchises?
+Respond with ONLY the word "true" if the response is valid and stays in-universe, or "false" if it mentions out-of-universe or real-world concepts. No other text."""
 
-        # Check for conversational filler - be more lenient
-        # Only flag filler if it's the majority of the response
-        filler_words = {"um", "uh", "ah", "like", "you know"}
-        filler_count = sum(1 for word in filler_words if word in response_lower)
-        total_words = len(response_lower.split())
+        try:
+            llm_resp = self.llm_runner.generate_response(
+                user_message=prompt,
+                conversation_history=[]
+            )
 
-        if filler_count > total_words * 0.3:  # More than 30% filler words
-            return False, "Response contains too much conversational filler"
+            content = llm_resp.content.strip().lower()
+            import string
+            content = content.translate(str.maketrans('', '', string.punctuation))
 
-        return True, "Response is valid and on-topic"
+            if 'true' in content and 'false' not in content:
+                return True, "Response is valid and on-topic"
+            elif 'false' in content and 'true' not in content:
+                return False, "Response contains out-of-universe information"
+            elif content.startswith('true'):
+                return True, "Response is valid and on-topic"
+            elif content.startswith('false'):
+                return False, "Response contains out-of-universe information"
+            else:
+                logger.warning(f"Could not parse true/false from validation LLM response: {llm_resp.content}")
+                return True, "Response appears to be valid"
+
+        except Exception as e:
+            logger.error(f"Error validating response with LLM: {e}")
+            return True, "Response appears to be valid (validation errored)"

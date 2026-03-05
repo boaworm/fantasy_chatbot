@@ -47,13 +47,6 @@ llm_runner = LLMRunner(
 # Create UniverseContext with the LLM runner
 universe_context = UniverseContext(universes=universes, llm_runner=llm_runner)
 
-# Create topic validator
-topic_validator = TopicValidator(
-    topics=[universe['name'] for universe in universes],
-    threshold=validation_config['similarity_threshold'],
-    use_fuzzy=validation_config['use_fuzzy_matching']
-)
-
 # Create a separate LLM runner for topic validation with a different system prompt
 topic_validator_llm = LLMRunner(
     api_url=llm_config['api_url'],
@@ -62,6 +55,13 @@ topic_validator_llm = LLMRunner(
     max_tokens=200,  # Short responses for validation
     system_prompt=validation_config.get('topic_validation_prompt', '')
 )
+
+# Create topic validator using the validation LLM
+topic_validator = TopicValidator(
+    universes=universes,
+    llm_runner=topic_validator_llm
+)
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -207,19 +207,21 @@ async def chat(request: ChatRequest):
             reason=f"Invalid universe: {request.universe}"
         )
 
-    # Validate user message against universe
-    is_on_topic, reason = universe_context.validate_query_against_universe(request.message)
-
-    if not is_on_topic:
-        return ChatResponse(
-            response="Sorry",
-            is_on_topic=False,
-            reason=reason
-        )
-
     # Initialize conversation if needed
     if request.conversation_id not in conversations:
         conversations[request.conversation_id] = []
+        
+    history = conversations[request.conversation_id]
+
+    # Validate user message against universe
+    is_on_topic, reason = universe_context.validate_query_against_universe(request.message, history)
+
+    if not is_on_topic:
+        return ChatResponse(
+            response=f"Sorry, I dont think that question is about {request.universe}.",
+            is_on_topic=False,
+            reason=reason
+        )
 
     # Rewrite query to include universe context
     rewritten_query = universe_context.rewrite_query(request.message)

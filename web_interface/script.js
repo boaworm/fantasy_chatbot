@@ -2,7 +2,7 @@
 
 // Get API base URL from query parameter or use default
 const urlParams = new URLSearchParams(window.location.search);
-const API_BASE = urlParams.get('api_url') || 'http://localhost:8000/api';
+let API_BASE = urlParams.get('api_url') || window.location.origin + '/api';
 console.log('API_BASE:', API_BASE);
 console.log('URL params:', urlParams.toString());
 
@@ -13,40 +13,83 @@ const sendButton = document.getElementById('send-button');
 const chatMessages = document.getElementById('chat-messages');
 const typingIndicator = document.getElementById('typing-indicator');
 const universeSelect = document.getElementById('universe-select');
-const apiUrlInput = document.getElementById('api-url-input');
-const saveApiUrlButton = document.getElementById('save-api-url');
+const startChatButton = document.getElementById('start-chat-button');
+const newChatButton = document.getElementById('new-chat-button');
+const selectionScreen = document.getElementById('universe-selection-screen');
+const inputArea = document.querySelector('.input-area');
+const paginationControls = document.getElementById('pagination-controls');
+const prevPageBtn = document.getElementById('prev-page');
+const nextPageBtn = document.getElementById('next-page');
+const pageIndicator = document.getElementById('page-indicator');
 
 // Conversation state
 let conversationId = null;
 let isTyping = false;
 let currentUniverse = null;
 let availableUniverses = [];
+let conversationHistory = [];
+let currentPageIndex = 0;
 
-// Initialize conversation
+// Initialize conversation setup
 function initConversation() {
     conversationId = 'conv_' + Date.now();
+    conversationHistory = [{
+        role: 'bot',
+        content: `Welcome to ${currentUniverse}! What would you like to ask?`
+    }];
+    currentPageIndex = 0;
+    renderCurrentPage();
 }
 
-// Add message to chat
-function addMessage(content, isUser = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+// Render the current page spread
+function renderCurrentPage() {
+    chatMessages.innerHTML = '';
 
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    contentDiv.textContent = content;
+    // Safety check
+    if (conversationHistory.length === 0) return;
 
-    messageDiv.appendChild(contentDiv);
-    chatMessages.appendChild(messageDiv);
+    // In our paginated flow, we show exactly ONE Q&A pair per "page flip" to ensure it fits the two-column spread.
+    // The welcome message is stand-alone.
+    const turn = conversationHistory[currentPageIndex];
 
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (turn.role === 'bot' && currentPageIndex === 0) {
+        chatMessages.innerHTML = `
+            <div class="message bot-message">
+                <div class="message-content">
+                    ${turn.content}
+                </div>
+            </div>
+        `;
+    } else {
+        // Render user question
+        const qDiv = document.createElement('div');
+        qDiv.className = 'message user-message';
+        qDiv.innerHTML = `<div class="message-content">${turn.question}</div>`;
+        chatMessages.appendChild(qDiv);
+
+        // Render bot answer
+        const aDiv = document.createElement('div');
+        aDiv.className = 'message bot-message';
+        aDiv.innerHTML = `<div class="message-content">${turn.answer}</div>`;
+        chatMessages.appendChild(aDiv);
+    }
+
+    // Update pagination controls
+    pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${conversationHistory.length}`;
+    prevPageBtn.disabled = currentPageIndex === 0;
+    nextPageBtn.disabled = currentPageIndex === conversationHistory.length - 1;
+}
+
+// Add message to chat array
+function addTurn(question, answer) {
+    conversationHistory.push({ question, answer });
+    currentPageIndex = conversationHistory.length - 1;
+    renderCurrentPage();
 }
 
 // Show typing indicator
 function showTyping() {
     typingIndicator.style.display = 'block';
-    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Hide typing indicator
@@ -58,8 +101,11 @@ function hideTyping() {
 async function sendMessage(message) {
     if (!message.trim() || isTyping) return;
 
-    // Add user message
-    addMessage(message, true);
+    // Fast-transition to new page logic - immediately display user question while waiting for answer.
+    conversationHistory.push({ question: message, answer: '...' });
+    currentPageIndex = conversationHistory.length - 1;
+    renderCurrentPage();
+
     messageInput.value = '';
     sendButton.disabled = true;
 
@@ -94,8 +140,9 @@ async function sendMessage(message) {
             throw new Error(data.detail || 'Failed to get response');
         }
 
-        // Add bot response
-        addMessage(data.response, false);
+        // Update the '...' with the real answer
+        conversationHistory[currentPageIndex].answer = data.response;
+        renderCurrentPage();
 
         // Update conversation ID if provided
         if (data.conversation_id) {
@@ -104,7 +151,8 @@ async function sendMessage(message) {
 
     } catch (error) {
         hideTyping();
-        addMessage(`Error: ${error.message}. Please try again.`, false);
+        conversationHistory[currentPageIndex].answer = `Error: ${error.message}. Please try again.`;
+        renderCurrentPage();
     }
 
     // Enable input
@@ -123,19 +171,52 @@ messageInput.addEventListener('input', () => {
     sendButton.disabled = !messageInput.value.trim();
 });
 
-// Save API URL button
-saveApiUrlButton.addEventListener('click', () => {
-    const newApiUrl = apiUrlInput.value.trim();
-    if (newApiUrl) {
-        // Update API_BASE
-        API_BASE = newApiUrl + '/api';
-        // Update URL without reloading
-        const url = new URL(window.location);
-        url.searchParams.set('api_url', API_BASE);
-        window.history.pushState({}, '', url);
-        // Re-fetch universes
-        fetchUniverses();
+// Start chat after universe selection
+startChatButton.addEventListener('click', () => {
+    if (currentUniverse) {
+        selectionScreen.style.display = 'none';
+        inputArea.style.display = 'block';
+        paginationControls.style.display = 'flex';
+        newChatButton.style.display = 'inline-block';
+        document.body.classList.add('chat-active');
+        initConversation();
+        messageInput.focus();
     }
+});
+
+// Pagination Controls
+prevPageBtn.addEventListener('click', () => {
+    if (currentPageIndex > 0) {
+        currentPageIndex--;
+        renderCurrentPage();
+    }
+});
+
+nextPageBtn.addEventListener('click', () => {
+    if (currentPageIndex < conversationHistory.length - 1) {
+        currentPageIndex++;
+        renderCurrentPage();
+    }
+});
+
+// New Chat button
+newChatButton.addEventListener('click', () => {
+    currentUniverse = null;
+    conversationId = null;
+    conversationHistory = [];
+    currentPageIndex = 0;
+    universeSelect.value = '';
+
+    // Hide chat UI & Reset
+    inputArea.style.display = 'none';
+    paginationControls.style.display = 'none';
+    newChatButton.style.display = 'none';
+    document.body.classList.remove('chat-active');
+    chatMessages.innerHTML = '';
+
+    // Show Selection Screen
+    selectionScreen.style.display = 'block';
+    startChatButton.disabled = true;
 });
 
 // Focus input on load
@@ -195,6 +276,7 @@ function updateFooter(universes) {
 // Handle universe selection change
 universeSelect.addEventListener('change', (e) => {
     currentUniverse = e.target.value;
+    startChatButton.disabled = !currentUniverse;
     messageInput.placeholder = `Ask about ${currentUniverse || 'your selected universe'}...`;
 });
 
@@ -213,10 +295,7 @@ async function checkHealth() {
 }
 
 // Initialize
-// Set the API URL input field value
-apiUrlInput.value = API_BASE.replace('/api', '');
-// Reconstruct API_BASE without /api suffix for the input
-API_BASE = API_BASE.replace('/api', '');
+inputArea.style.display = 'none';
 
 fetchUniverses();
 checkHealth();
