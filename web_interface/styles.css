@@ -206,20 +206,30 @@ body.chat-active .new-chat-btn {
     font-family: 'Georgia', serif;
     font-size: 1.1rem;
     line-height: 1.8;
-    overflow: hidden;
-    /* Text that doesn't fit clips — columns handle flow */
 
-    /* CSS multi-column: text flows left→right across the 2 columns */
+    /* CSS columns overflow HORIZONTALLY into a 3rd, 4th column etc.
+       We scroll left/right to reach them via the Next/Prev buttons. */
+    overflow-x: scroll;
+    overflow-y: hidden;
+    /* Hide scrollbar visual — nav is via buttons */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    /* CSS multi-column: text flows left-to-right across the 2 columns */
     column-count: 1;
     column-gap: 80px;
     column-fill: auto;
-    /* Fill column to height before starting next */
+}
+
+/* Hide scrollbar for WebKit browsers */
+.book-spread::-webkit-scrollbar {
+    display: none;
 }
 
 @media (min-width: 768px) {
     .book-spread {
         column-count: 2;
-        overflow: hidden;
+        /* overflow-x:scroll stays — don't override here */
     }
 
     .book-wrapper::before,

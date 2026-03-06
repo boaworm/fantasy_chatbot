@@ -116,10 +116,11 @@ function renderCurrentPage() {
         }
     }
 
+    // Reset to left edge when rendering a new turn (overflow goes right, not down)
+    chatMessages.scrollLeft = 0;
+
     // Update pagination controls
-    pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${conversationHistory.length}`;
-    prevPageBtn.disabled = currentPageIndex === 0;
-    nextPageBtn.disabled = currentPageIndex === conversationHistory.length - 1;
+    updatePageIndicator();
 
     // Ensure visibility
     document.getElementById('pagination-controls').style.display = 'flex';
@@ -232,18 +233,48 @@ startChatButton.addEventListener('click', () => {
 
 // Event Listeners for Pagination
 prevPageBtn.addEventListener('click', () => {
-    if (currentPageIndex > 0) {
+    const spread = document.getElementById('chat-messages');
+    if (spread.scrollLeft > 5) {
+        // More spreads to the left within this turn — scroll left one viewport width
+        spread.scrollBy({ left: -spread.clientWidth, behavior: 'smooth' });
+        setTimeout(updatePageIndicator, 350);
+    } else if (currentPageIndex > 0) {
+        // At leftmost — go to previous Q&A turn
         currentPageIndex--;
         renderCurrentPage();
+        // After render, jump to the rightmost position of that turn
+        setTimeout(() => {
+            spread.scrollLeft = spread.scrollWidth;
+            updatePageIndicator();
+        }, 80);
     }
 });
 
 nextPageBtn.addEventListener('click', () => {
-    if (currentPageIndex < conversationHistory.length - 1) {
+    const spread = document.getElementById('chat-messages');
+    const atRight = spread.scrollLeft + spread.clientWidth >= spread.scrollWidth - 5;
+    if (!atRight) {
+        // More content to the right within this turn (3rd/4th column) — scroll right
+        spread.scrollBy({ left: spread.clientWidth, behavior: 'smooth' });
+        setTimeout(updatePageIndicator, 350);
+    } else if (currentPageIndex < conversationHistory.length - 1) {
+        // At rightmost — go to next Q&A turn
         currentPageIndex++;
         renderCurrentPage();
     }
 });
+
+function updatePageIndicator() {
+    const spread = document.getElementById('chat-messages');
+    const atLeft = spread.scrollLeft < 5;
+    const atRight = spread.scrollLeft + spread.clientWidth >= spread.scrollWidth - 5;
+    const isFirstTurn = currentPageIndex === 0;
+    const isLastTurn = currentPageIndex === conversationHistory.length - 1;
+
+    prevPageBtn.disabled = atLeft && isFirstTurn;
+    nextPageBtn.disabled = atRight && isLastTurn;
+    pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${conversationHistory.length}`;
+}
 
 // New Chat button
 newChatButton.addEventListener('click', () => {
