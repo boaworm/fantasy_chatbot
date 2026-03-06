@@ -67,12 +67,24 @@ header h1 {
 }
 
 /* Chat Active State */
+body.chat-active {
+    padding: 0;
+}
+
+body.chat-active .container {
+    padding: 10px 20px 20px 20px;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+    max-width: 100%;
+}
+
 body.chat-active header .subtitle {
     display: none;
 }
 
 body.chat-active header {
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -90,22 +102,25 @@ body.chat-active .new-chat-btn {
 .chat-container {
     display: flex;
     flex-direction: column;
-    height: 75vh;
-    min-height: 600px;
-    /* Give it more space */
+    /* Use calc to account for the header height */
+    height: calc(100vh - 90px);
+    max-height: calc(100vh - 90px);
+    overflow: hidden;
+    /* The critical clip boundary */
     align-items: center;
-    /* Center the book */
-    padding-top: 20px;
+    padding-top: 5px;
 }
 
 /* The Leather Cover */
 .book-cover {
     flex: 1;
+    min-height: 0;
+    /* Critical: allows flex child to shrink and not overflow */
     display: flex;
     justify-content: center;
     width: 100%;
     max-width: 1200px;
-    margin-bottom: 25px;
+    margin-bottom: 15px;
     background: #3b2a1a;
     border-radius: 12px 12px 12px 12px;
     box-shadow:
@@ -114,19 +129,20 @@ body.chat-active .new-chat-btn {
         0 20px 40px rgba(0, 0, 0, 0.6),
         0 1px 3px rgba(0, 0, 0, 0.8);
     padding: 15px 20px;
-    /* Cover extending past pages */
     position: relative;
+    overflow: hidden;
+    /* Never let the cover grow */
 }
 
 /* The Thick Stack of Pages */
 .book-wrapper {
     flex: 1;
+    min-height: 0;
+    /* Critical: allows flex child to shrink and not overflow */
     display: flex;
     justify-content: center;
     position: relative;
-    /* Dramatic curve for the top and bottom of the pages */
     border-radius: 12px 12px 12px 12px / 25px 25px 8px 8px;
-    /* Paper stack illusion via thick stacked box shadow */
     box-shadow:
         -2px 0 1px #e3dac9,
         -4px 0 1px #d3c9b4,
@@ -136,7 +152,6 @@ body.chat-active .new-chat-btn {
         6px 0 1px #c1b59c,
         inset 0 0 20px rgba(0, 0, 0, 0.2);
     background: #fdfaf0;
-    /* Antique paper base */
     background-image: linear-gradient(90deg,
             rgba(255, 255, 255, 0) 0%,
             rgba(0, 0, 0, 0.03) 1%,
@@ -145,6 +160,7 @@ body.chat-active .new-chat-btn {
             rgba(0, 0, 0, 0.03) 99%,
             rgba(255, 255, 255, 0) 100%);
     overflow: hidden;
+    /* Clip content here - never grow */
     width: 100%;
 }
 
@@ -184,26 +200,26 @@ body.chat-active .new-chat-btn {
 .book-spread {
     width: 100%;
     height: 100%;
+    /* Fill the wrapper exactly */
     padding: 25px 40px;
     color: #2b261b;
-    /* Aged ink color */
     font-family: 'Georgia', serif;
     font-size: 1.1rem;
     line-height: 1.8;
-    overflow-y: auto;
+    overflow: hidden;
+    /* Text that doesn't fit clips — columns handle flow */
 
-    /* single column on mobile by default */
+    /* CSS multi-column: text flows left→right across the 2 columns */
     column-count: 1;
     column-gap: 80px;
-    /* Wide gap for the spine */
     column-fill: auto;
+    /* Fill column to height before starting next */
 }
 
 @media (min-width: 768px) {
     .book-spread {
         column-count: 2;
         overflow: hidden;
-        /* Hide scrollbar for true book feel when paginating */
     }
 
     .book-wrapper::before,
@@ -437,6 +453,10 @@ body.chat-active .new-chat-btn {
     display: flex;
     gap: 10px;
     margin-top: auto;
+    width: 66%;
+    /* 2/3 of width */
+    max-width: 900px;
+    /* Max constraint so it doesn't get wildly wide */
 }
 
 #chat-form {

@@ -41,6 +41,43 @@ function initConversation() {
     renderCurrentPage();
 }
 
+// Simple markdown parser to handle bullet points and basic formatting
+function formatMarkdown(text) {
+    if (!text) return "";
+
+    // First, temporarily protect any existing HTML (like our image blobl) by splitting on tags
+    // A simplistic approach: just apply regexes to text outside of complete tags if needed, 
+    // but the image blob is currently added at the very start of the string.
+
+    let html = text;
+
+    // Convert bold text
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // Convert italic text
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+    // Add a break before bullet points (* item or - item) if they don't already start on a new line
+    html = html.replace(/([^\n])\s*([\*\-])\s+/g, '$1<br>$2 ');
+
+
+
+    // Convert double newlines into paragraphs, being careful not to wrap <ul> or <div> tags
+    // First, split by double newlines
+    let blocks = html.split(/\n\s*\n/);
+    html = blocks.map(block => {
+        if (block.trim().startsWith('<div')) {
+            return block; // Don't wrap existing block elements
+        } else if (block.trim().length > 0) {
+            // Convert internal single newlines to <br> for regular text
+            return '<p>' + block.trim().replace(/\n/g, '<br>') + '</p>';
+        }
+        return '';
+    }).join('\n');
+
+    return html;
+}
+
 // Render the current page spread
 function renderCurrentPage() {
     chatMessages.innerHTML = '';
@@ -48,15 +85,14 @@ function renderCurrentPage() {
     // Safety check
     if (conversationHistory.length === 0) return;
 
-    // In our paginated flow, we show exactly ONE Q&A pair per "page flip" to ensure it fits the two-column spread.
-    // The welcome message is stand-alone.
+    // Show exactly ONE Q&A pair per "page flip" to ensure it fits the two-column spread.
     const turn = conversationHistory[currentPageIndex];
 
     if (turn.role === 'bot' && currentPageIndex === 0) {
         chatMessages.innerHTML = `
             <div class="message bot-message">
                 <div class="message-content">
-                    ${turn.content}
+                    ${formatMarkdown(turn.content)}
                 </div>
             </div>
         `;
@@ -68,16 +104,25 @@ function renderCurrentPage() {
         chatMessages.appendChild(qDiv);
 
         // Render bot answer
-        const aDiv = document.createElement('div');
-        aDiv.className = 'message bot-message';
-        aDiv.innerHTML = `<div class="message-content">${turn.answer}</div>`;
-        chatMessages.appendChild(aDiv);
+        if (turn.answer) {
+            const aDiv = document.createElement('div');
+            aDiv.className = 'message bot-message';
+
+            // Don't double format '...'
+            let formattedAnswer = turn.answer === '...' ? '...' : formatMarkdown(turn.answer);
+
+            aDiv.innerHTML = `<div class="message-content">${formattedAnswer}</div>`;
+            chatMessages.appendChild(aDiv);
+        }
     }
 
     // Update pagination controls
     pageIndicator.textContent = `Page ${currentPageIndex + 1} of ${conversationHistory.length}`;
     prevPageBtn.disabled = currentPageIndex === 0;
     nextPageBtn.disabled = currentPageIndex === conversationHistory.length - 1;
+
+    // Ensure visibility
+    document.getElementById('pagination-controls').style.display = 'flex';
 }
 
 // Add message to chat array
@@ -181,10 +226,11 @@ startChatButton.addEventListener('click', () => {
         document.body.classList.add('chat-active');
         initConversation();
         messageInput.focus();
+        hideTyping();
     }
 });
 
-// Pagination Controls
+// Event Listeners for Pagination
 prevPageBtn.addEventListener('click', () => {
     if (currentPageIndex > 0) {
         currentPageIndex--;
