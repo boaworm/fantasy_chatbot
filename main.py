@@ -93,6 +93,7 @@ class ChatRequest(BaseModel):
     message: str
     universe: str
     conversation_id: Optional[str] = None
+    children_mode: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -231,6 +232,10 @@ async def chat(request: ChatRequest):
 
     # Rewrite query to include universe context
     rewritten_query = universe_context.rewrite_query(request.message)
+
+    # If children's book mode is enabled, instruct the LLM to simplify language
+    if request.children_mode:
+        rewritten_query += " This is a story for a child, so use simple words and short to medium length sentences."
 
     # Generate LLM response
     try:

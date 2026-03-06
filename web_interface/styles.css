@@ -467,6 +467,26 @@ body.chat-active .new-chat-btn {
     /* 2/3 of width */
     max-width: 900px;
     /* Max constraint so it doesn't get wildly wide */
+    align-items: center;
+}
+
+.childrens-book-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.85rem;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.childrens-book-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #e94560;
 }
 
 #chat-form {

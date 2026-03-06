@@ -21,6 +21,7 @@ const paginationControls = document.getElementById('pagination-controls');
 const prevPageBtn = document.getElementById('prev-page');
 const nextPageBtn = document.getElementById('next-page');
 const pageIndicator = document.getElementById('page-indicator');
+const childrensBookCheckbox = document.getElementById('childrens-book-checkbox');
 
 // Conversation state
 let conversationId = null;
@@ -173,7 +174,8 @@ async function sendMessage(message) {
             body: JSON.stringify({
                 message: message,
                 universe: currentUniverse,
-                conversation_id: conversationId
+                conversation_id: conversationId,
+                children_mode: childrensBookCheckbox.checked
             })
         });
 
