@@ -139,7 +139,7 @@ If the question is generic, such as "What is a dragon?" or "Tell me about a famo
             return self.current_universe.keywords
         return []
 
-    def validate_query_against_universe(self, query: str, history: Optional[List[Dict[str, str]]] = None) -> tuple[bool, Optional[str]]:
+    def validate_query_against_universe(self, query: str, history: Optional[List[Dict[str, str]]] = None) -> tuple[bool, Optional[str], Optional[str]]:
         """
         Validate that a query is related to the current universe using LLM.
 
@@ -148,18 +148,18 @@ If the question is generic, such as "What is a dragon?" or "Tell me about a famo
             history: Optional conversation history to provide context for pronouns
 
         Returns:
-            Tuple of (is_valid, reason)
+            Tuple of (is_valid, reason, extracted_entity_name)
         """
         if not self.current_universe:
-            return False, "No universe selected"
+            return False, "No universe selected", None
 
         # If LLM is available, use it to determine if the topic is related
         if self.llm_runner:
             try:
-                is_related, reason = self._check_topic_with_llm(query, history)
+                is_related, reason, entity = self._check_topic_with_llm(query, history)
                 if is_related:
-                    return True, reason
-                return False, reason
+                    return True, reason, entity
+                return False, reason, None
             except Exception as e:
                 logger.warning(f"LLM validation failed: {e}, falling back to keyword matching")
 
@@ -169,24 +169,24 @@ If the question is generic, such as "What is a dragon?" or "Tell me about a famo
         # Check if query contains any universe keywords
         for keyword in self.current_universe.keywords:
             if keyword.lower() in query_lower:
-                return True, f"Related to {self.current_universe.name}"
+                return True, f"Related to {self.current_universe.name}", None
 
         # Check for universe name
         if self.current_universe.name.lower() in query_lower:
-            return True, f"Related to {self.current_universe.name}"
+            return True, f"Related to {self.current_universe.name}", None
 
-        return False, f"Not related to {self.current_universe.name}"
+        return False, f"Not related to {self.current_universe.name}", None
 
-    def _check_topic_with_llm(self, query: str, history: Optional[List[Dict[str, str]]] = None) -> tuple[bool, Optional[str]]:
+    def _check_topic_with_llm(self, query: str, history: Optional[List[Dict[str, str]]] = None) -> tuple[bool, Optional[str], Optional[str]]:
         """
-        Use LLM to check if a topic is related to the current universe.
+        Use LLM to check if a topic is related to the current universe, and extract the main entity.
 
         Args:
             query: Query to check
             history: Optional conversation history to provide context
 
         Returns:
-            Tuple of (is_related, reason)
+            Tuple of (is_related, reason, entity_name)
         """
         universe_name = self.current_universe.name
         keywords = ", ".join(self.current_universe.keywords)
@@ -206,21 +206,26 @@ If the question is generic, such as "What is a dragon?" or "Tell me about a famo
                 context_str += f"{role}: {content}\n"
 
         prompt = f"""You are a strict topic validator for a fantasy chatbot. Your task is to determine if a user's question can be answered within the context of the selected fantasy universe.
+You must also identify the primary entity (Character, Place, Creature, or Event) the user is asking about so we can search for an image of it later.
 
 Current universe: {universe_name}
 Universe keywords: {keywords}
 {context_str}
 User question: "{query}"
 
-Does the user question make sense to answer from the perspective of the {universe_name} universe?
-Can the question be answered using the lore, characters, places, or rules of this universe?
-(If the question uses pronouns like "he" or "it", use the provided conversation context to understand what it refers to).
-Respond with ONLY the word "true" if it can be answered, or "false" if it cannot. No other text, no explanation, no punctuation, and no JSON formatting.
+1. Does the user question make sense to answer from the perspective of the {universe_name} universe?
+2. If YES, what is the main specific Entity (Character, Place, Creature, Event) being asked about? (Resolve pronouns using context if needed).
+
+If the answer is YES, respond with exactly: true|<Entity Name>
+If there is no specific visualizable entity, respond: true|none
+If the answer is NO, respond with exactly: false
+
+Do not include any other text, explanation, or JSON formatting.
 
 Examples:
 Universe: Lord of the Rings
 Question: "Who is the Dark Lord?"
-Response: true
+Response: true|Sauron
 
 Universe: Lord of the Rings
 Question: "What is the capital of France?"
@@ -228,23 +233,19 @@ Response: false
 
 Universe: Belgariad
 Question: "Who is the main antagonist?"
-Response: true
-
-Universe: Belgariad
-Question: "What is the tallest mountain on Earth?"
-Response: false
+Response: true|Torak
 
 Universe: Lord of the Rings
-Question: "Tell me about the Green Dragon inv."
-Response: true
+Question: "Tell me about the Green Dragon inn."
+Response: true|Green Dragon
 
 Universe: Lord of the Rings
 Question: "Tell me about a famous green dragon."
 Response: false
 
 Universe: Dungeons & Dragons
-Question: "Tell me about a famous green dragon."
-Response: true"""
+Question: "What happens if I roll a 20?"
+Response: true|none"""
 
         try:
             response = self.llm_runner.generate_response(
@@ -254,23 +255,30 @@ Response: true"""
 
             content = response.content.strip().lower()
             
-            # Remove any trailing punctuation just in case
+            # Remove trailing punctuation but keep the | separator
             import string
-            content = content.translate(str.maketrans('', '', string.punctuation))
+            for stop_char in string.punctuation:
+                if stop_char != '|' and content.endswith(stop_char):
+                    content = content.rstrip(string.punctuation)
 
-            if 'true' in content and 'false' not in content:
-                return True, "Topic is related to the universe"
-            elif 'false' in content and 'true' not in content:
-                return False, "Topic is not related to the universe"
-            elif content.startswith('true'):
-                return True, "Topic is related to the universe"
+            if content.startswith('true'):
+                entity = None
+                if '|' in content:
+                    parts = content.split('|', 1)
+                    if len(parts) > 1 and parts[1].strip() != 'none':
+                        # Keep original casing by doing a case-insensitive search in the original response
+                        # But for simplicity since Wikipedia API is somewhat case-forgiving, we just use the lower case extraction for now
+                        entity = parts[1].strip()
+                return True, "Topic is related to the universe", entity
+                
             elif content.startswith('false'):
-                return False, "Topic is not related to the universe"
+                return False, "Topic is not related to the universe", None
+                
             else:
-                logger.warning(f"Could not parse true/false from LLM response: {response.content}")
-                return True, "Topic appears to be related"
+                logger.warning(f"Could not parse true/false logic from LLM response: {response.content}")
+                return True, "Topic appears to be related", None
 
         except Exception as e:
             logger.error(f"Error checking topic with LLM: {e}")
             # For any other error, assume it's related to avoid false negatives
-            return True, "Topic appears to be related"
+            return True, "Topic appears to be related", None

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from services.topic_validator import TopicValidator
 from services.llm_runner import LLMRunner, LLMResponse
 from services.universe_context import UniverseContext
+from services.image_search import WikipediaImageSearch
 
 # Configure logging
 logging.basicConfig(
@@ -61,6 +62,9 @@ topic_validator = TopicValidator(
     universes=universes,
     llm_runner=topic_validator_llm
 )
+
+# Create image searcher
+image_searcher = WikipediaImageSearch()
 
 
 # Create FastAPI app
@@ -204,7 +208,8 @@ async def chat(request: ChatRequest):
         return ChatResponse(
             response=f"I'm sorry, but I don't have information about '{request.universe}'. Please select a valid universe from the dropdown.",
             is_on_topic=False,
-            reason=f"Invalid universe: {request.universe}"
+            reason=f"Invalid universe: {request.universe}",
+            conversation_id=request.conversation_id
         )
 
     # Initialize conversation if needed
@@ -214,13 +219,14 @@ async def chat(request: ChatRequest):
     history = conversations[request.conversation_id]
 
     # Validate user message against universe
-    is_on_topic, reason = universe_context.validate_query_against_universe(request.message, history)
+    is_on_topic, reason, extracted_entity = universe_context.validate_query_against_universe(request.message, history)
 
     if not is_on_topic:
         return ChatResponse(
             response=f"Sorry, I dont think that question is about {request.universe}.",
             is_on_topic=False,
-            reason=reason
+            reason=reason,
+            conversation_id=request.conversation_id
         )
 
     # Rewrite query to include universe context
@@ -246,15 +252,32 @@ async def chat(request: ChatRequest):
             return ChatResponse(
                 response=f"I apologize, but I need to stay on topic. {response_reason}",
                 is_on_topic=False,
-                reason=response_reason
+                reason=response_reason,
+                conversation_id=request.conversation_id
             )
+
+        final_answer = cleaned_response
+        # Look up an image if an entity was extracted
+        if extracted_entity:
+            print(f"Attempting image search for entity: {extracted_entity} in {request.universe}")
+            image_url = image_searcher.get_image_url(extracted_entity, request.universe)
+            if image_url:
+                print(f"Embedding image: {image_url}")
+                # Embed image in answer
+                final_answer = f"""
+<div class="entity-illustration-container">
+    <img src="{image_url}" alt="Illustration of {extracted_entity}" class="entity-illustration">
+    <div class="entity-caption">{extracted_entity}</div>
+</div>
+{final_answer}
+"""
 
         # Update conversation history with cleaned response
         conversations[request.conversation_id].append(
             {"role": "user", "content": request.message}
         )
         conversations[request.conversation_id].append(
-            {"role": "assistant", "content": cleaned_response}
+            {"role": "assistant", "content": cleaned_response} # Store raw content without HTML in history
         )
 
         # Keep conversation history manageable
@@ -262,7 +285,7 @@ async def chat(request: ChatRequest):
             conversations[request.conversation_id] = conversations[request.conversation_id][-10:]
 
         return ChatResponse(
-            response=cleaned_response,
+            response=final_answer,
             is_on_topic=True,
             reason="Response is valid and on-topic",
             conversation_id=request.conversation_id

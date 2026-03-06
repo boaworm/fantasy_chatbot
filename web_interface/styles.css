@@ -302,6 +302,42 @@ body.chat-active .new-chat-btn {
     margin-bottom: 1em;
 }
 
+/* Dynamic Image Styling - Book Illustration look */
+.entity-illustration-container {
+    float: right;
+    margin: 10px 0 15px 25px;
+    max-width: 45%;
+    text-align: center;
+    background: #fff;
+    padding: 10px;
+    border: 1px solid #e0d8c8;
+    box-shadow: 2px 3px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+    transform: rotate(1deg);
+    /* Slight tilt for realism */
+    transition: transform 0.3s ease;
+}
+
+.entity-illustration-container:hover {
+    transform: rotate(0deg) scale(1.02);
+}
+
+.entity-illustration {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #d0c8b8;
+    display: block;
+    margin: 0 auto;
+}
+
+.entity-caption {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: #666;
+    margin-top: 8px;
+    font-family: 'Georgia', serif;
+}
+
 .typing-indicator {
     padding: 10px 20px;
     margin-bottom: 15px;
