@@ -3,6 +3,7 @@
 # List of allowed universes with their keywords
 universes:
   - name: "Lord of the Rings"
+    wiki_api_base: "https://lotr.fandom.com/api.php"
     keywords:
       - Hobbits
       - Elven Rings
@@ -10,6 +11,7 @@ universes:
       - Middle-earth
       - Fellowship
   - name: "The Belgariad"
+    wiki_api_base: "https://davideddings.fandom.com/api.php"
     keywords:
       - Belgarath
       - Polgara
@@ -17,6 +19,7 @@ universes:
       - Aldur
       - Riva  
   - name: "Dungeons & Dragons"
+    wiki_api_base: "https://forgottenrealms.fandom.com/api.php"
     keywords:
       - Dungeons
       - Dragons

@@ -3,8 +3,10 @@ Main application entry point for Fantasy Chatbot Layer.
 Sets up FastAPI server with chat endpoints.
 """
 
+import asyncio
 import logging
 import yaml
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -63,8 +65,12 @@ topic_validator = TopicValidator(
     llm_runner=topic_validator_llm
 )
 
-# Create image searcher
+# Create image searcher and shared thread pool executor
 image_searcher = WikipediaImageSearch()
+_executor = ThreadPoolExecutor(max_workers=4)
+
+# Path for saving proxied images
+IMAGE_SAVE_DIR = Path(__file__).parent / "web_interface" / "images"
 
 
 # Create FastAPI app
@@ -237,12 +243,51 @@ async def chat(request: ChatRequest):
     if request.children_mode:
         rewritten_query += " This is a story for a child, so use simple words and short to medium length sentences."
 
-    # Generate LLM response
+    # Get wiki URL for the current universe (before entering the async block)
+    current_universe = universe_context.get_current_universe()
+    wiki_api_base = current_universe.wiki_api_base if current_universe else None
+
+    # -------------------------------------------------------------------
+    # Parallel execution: start LLM text generation and image search at
+    # the same time so the user doesn't wait for both sequentially.
+    # -------------------------------------------------------------------
     try:
-        llm_response = llm_runner.generate_response(
-            user_message=rewritten_query,
-            conversation_history=conversations[request.conversation_id]
-        )
+        loop = asyncio.get_event_loop()
+
+        # Wrap both blocking calls so they can run concurrently
+        async def run_llm():
+            return await loop.run_in_executor(
+                _executor,
+                lambda: llm_runner.generate_response(
+                    user_message=rewritten_query,
+                    conversation_history=conversations[request.conversation_id]
+                )
+            )
+
+        async def run_image_search():
+            if not extracted_entity:
+                return None
+            logger.info(f"Searching image for '{extracted_entity}' on {wiki_api_base or 'Wikipedia'}")
+            
+            # Step 1: Get the remote URL
+            remote_url = await loop.run_in_executor(
+                _executor,
+                lambda: image_searcher.get_image_url(extracted_entity, request.universe, wiki_api_base)
+            )
+            
+            if not remote_url:
+                return None
+                
+            # Step 2: Download locally to bypass hotlink protection
+            local_filename = await loop.run_in_executor(
+                _executor,
+                lambda: image_searcher.download_image(remote_url, str(IMAGE_SAVE_DIR))
+            )
+            
+            return local_filename
+
+        # Fire both off at the same time
+        llm_response, image_filename = await asyncio.gather(run_llm(), run_image_search())
 
         # Clean the response to remove analysis steps and formatting
         cleaned_response = clean_llm_response(llm_response.content)
@@ -262,16 +307,12 @@ async def chat(request: ChatRequest):
             )
 
         final_answer = cleaned_response
-        # Look up an image if an entity was extracted
-        if extracted_entity:
-            print(f"Attempting image search for entity: {extracted_entity} in {request.universe}")
-            image_url = image_searcher.get_image_url(extracted_entity, request.universe)
-            if image_url:
-                print(f"Embedding image: {image_url}")
-                # Embed image in answer
-                final_answer = f"""
+        if image_filename:
+            image_path = f"/static/images/{image_filename}"
+            logger.info(f"Embedding local image: {image_path}")
+            final_answer = f"""
 <div class="entity-illustration-container">
-    <img src="{image_url}" alt="Illustration of {extracted_entity}" class="entity-illustration">
+    <img src="{image_path}" alt="Illustration of {extracted_entity}" class="entity-illustration">
     <div class="entity-caption">{extracted_entity}</div>
 </div>
 {final_answer}

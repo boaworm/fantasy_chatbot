@@ -22,6 +22,7 @@ class Universe(BaseModel):
     """Model for a fantasy universe."""
     name: str
     keywords: List[str]
+    wiki_api_base: Optional[str] = None
 
 
 class UniverseContext:
