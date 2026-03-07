@@ -16,10 +16,8 @@ A chatbot layer that provides universe-specific conversations with LLM integrati
 The following universes are supported (configurable in `config.yaml`):
 
 - Lord of the Rings
-- The Silmarillion
 - The Belgariad
 - Dungeons & Dragons
-- Forgotten Realms
 
 ## Project Structure
 
@@ -57,7 +55,8 @@ Edit `config.yaml` to customize:
 ```yaml
 universes:
   - name: "Lord of the Rings"
-    resources:
+    wiki_api_base: "https://lotr.fandom.com/api.php"
+    keywords:
       - "Middle Earth"
       - "Gandalf"
       - "Frodo Baggins"
@@ -72,10 +71,6 @@ universes:
       - "Hobbits"
       - "Wizards"
       - "Rings of Power"
-    system_prompt: "You are a knowledgeable guide through Middle Earth. Answer questions about the Lord of the Rings universe, its characters, places, and lore."
-
-  - name: "The Silmarillion"
-    resources:
       - "Valar"
       - "Maiar"
       - "Melkor"
@@ -88,10 +83,9 @@ universes:
       - "Teleri"
       - "First Age"
       - "Tolkien mythology"
-    system_prompt: "You are a scholar of Tolkien's mythology. Answer questions about the creation myths, the Valar, and the ancient history of Middle Earth."
-
   - name: "The Belgariad"
-    resources:
+    wiki_api_base: "https://davideddings.fandom.com/api.php"
+    keywords:
       - "Belgarath"
       - "Polgara"
       - "Belgarion"
@@ -105,10 +99,24 @@ universes:
       - "Witch-Queen"
       - "Polgara's spells"
       - "The Prophecy"
-    system_prompt: "You are a historian of the Belgariad universe. Answer questions about the ancient prophecies, the gods, and the history of the Alorn kingdoms."
-
   - name: "Dungeons & Dragons"
-    resources:
+    wiki_api_base: "https://forgottenrealms.fandom.com/api.php"
+    keywords:
+      - "Faerûn"
+      - "Waterdeep"
+      - "Baldur's Gate"
+      - "Elminster"
+      - "Mystra"
+      - "Cormyr"
+      - "Shadowrun"
+      - "Drizzt Do'Urden"
+      - "Beregost"
+      - "Icewind Dale"
+      - "Silverymoon"
+      - "Chult"
+      - "Tyranny of Dragons"
+      - "Waterdeep: Dragon Heist"
+      - "Forgotten Realms wiki"
       - "D&D"
       - "Dungeons"
       - "Dragons"
@@ -126,32 +134,13 @@ universes:
       - "Dungeon Master"
       - "AD&D"
       - "5th Edition"
-    system_prompt: "You are a Dungeon Master and lore expert. Answer questions about D&D rules, spells, monsters, and the multiverse."
-
-  - name: "Forgotten Realms"
-    resources:
-      - "Faerûn"
-      - "Waterdeep"
-      - "Baldur's Gate"
-      - "Elminster"
-      - "Mystra"
-      - "Cormyr"
-      - "Shadowrun"
-      - "Drizzt Do'Urden"
-      - "Beregost"
-      - "Icewind Dale"
-      - "Silverymoon"
-      - "Chult"
-      - "Tyranny of Dragons"
-      - "Waterdeep: Dragon Heist"
-      - "Forgotten Realms wiki"
-    system_prompt: "You are a master of Faerûnian lore. Answer questions about the Forgotten Realms setting, its cities, deities, and adventures."
 
 llm:
-  api_url: "http://localhost:1234/v1/chat/completions"
+  api_url: "http://192.168.1.183:1234/v1"
   model: "local-model"
   temperature: 0.7
   max_tokens: 500
+  system_prompt: "You are a helpful assistant specializing in fantasy literature and role-playing games. Answer questions about the topics listed in your system instructions."
 ```
 
 ## Usage

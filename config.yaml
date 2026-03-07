@@ -5,28 +5,83 @@ universes:
   - name: "Lord of the Rings"
     wiki_api_base: "https://lotr.fandom.com/api.php"
     keywords:
-      - Hobbits
-      - Elven Rings
-      - Sauron
-      - Middle-earth
-      - Fellowship
+      - "Middle Earth"
+      - "Gandalf"
+      - "Frodo Baggins"
+      - "The Shire"
+      - "Mordor"
+      - "Rivendell"
+      - "Gollum"
+      - "Sauron"
+      - "Aragorn"
+      - "Legolas"
+      - "Gimli"
+      - "Hobbits"
+      - "Wizards"
+      - "Rings of Power"
+      - "Valar"
+      - "Maiar"
+      - "Melkor"
+      - "Fëanor"
+      - "The Silmarils"
+      - "Aulë"
+      - "Yavanna"
+      - "Morgoth"
+      - "Noldor"
+      - "Teleri"
+      - "First Age"
+      - "Tolkien mythology"
   - name: "The Belgariad"
     wiki_api_base: "https://davideddings.fandom.com/api.php"
     keywords:
-      - Belgarath
-      - Polgara
-      - Garion
-      - Aldur
-      - Riva  
+      - "Belgarath"
+      - "Polgara"
+      - "Belgarion"
+      - "Dol Goldur"
+      - "Riva"
+      - "Cthragga"
+      - "Angarak"
+      - "Witch-king"
+      - "Orca"
+      - "Alorn"
+      - "Witch-Queen"
+      - "Polgara's spells"
+      - "The Prophecy"
   - name: "Dungeons & Dragons"
     wiki_api_base: "https://forgottenrealms.fandom.com/api.php"
     keywords:
-      - Dungeons
-      - Dragons
-      - Wizards
-      - Monsters
-      - Adventures
-      - Forgotten Realms
+      - "Faerûn"
+      - "Waterdeep"
+      - "Baldur's Gate"
+      - "Elminster"
+      - "Mystra"
+      - "Cormyr"
+      - "Shadowrun"
+      - "Drizzt Do'Urden"
+      - "Beregost"
+      - "Icewind Dale"
+      - "Silverymoon"
+      - "Chult"
+      - "Tyranny of Dragons"
+      - "Waterdeep: Dragon Heist"
+      - "Forgotten Realms wiki"
+      - "D&D"
+      - "Dungeons"
+      - "Dragons"
+      - "Tyr"
+      - "Bane"
+      - "Lolth"
+      - "Drow"
+      - "Paladin"
+      - "Ranger"
+      - "Wizard"
+      - "Fighter"
+      - "Rogue"
+      - "Bard"
+      - "Cleric"
+      - "Dungeon Master"
+      - "AD&D"
+      - "5th Edition"
 
 # LLM Configuration
 llm:
@@ -35,9 +90,9 @@ llm:
   # Model name
   model: "local-model"
   # Temperature for response generation (0.0-2.0)
-  temperature: 0.7
+  temperature: 0.3
   # Maximum tokens in response
-  max_tokens: 500
+  max_tokens: 5000
   # System prompt for the LLM
   system_prompt: "You are a helpful assistant specializing in fantasy literature and role-playing games. Answer questions about the topics listed in your system instructions."
 

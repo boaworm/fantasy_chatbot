@@ -108,11 +108,17 @@ class UniverseContext:
         if not self.current_universe:
             return query
 
-        rewritten = f"""{query}
+        rewritten = f"""START_USER_QUESTION {query} END_USER_QUESTION
 
-(Please answer this question strictly from the perspective of the {self.current_universe.name} universe.
-Your answer may only contain places, names, characters and events from {self.current_universe.name}.
-If the question is generic, such as "What is a dragon?" or "Tell me about a famous character", provide an answer based entirely on the lore of {self.current_universe.name} and do not reference generic concepts from outside this universe.)"""
+START_UNIVERSE_CONTEXT
+(Please answer this question from the perspective of the {self.current_universe.name} universe.
+Your answer can include information about places, names, characters, and events from {self.current_universe.name}, as well as meta-information about the books, authors, and publication history.
+If the question is generic, such as "What is a dragon?" or "Tell me about a famous character", provide an answer based entirely on the lore of {self.current_universe.name} and do not reference generic concepts from outside this universe.)
+END_UNIVERSE_CONTEXT
+
+CRITICAL QUOTE RULES:
+1. Do not present quotes from the literature. You are not capable of quoting accuratenly from the literature.
+"""
 
         log_friendly = rewritten.replace('\n', ' ')
         logger.info(f"Rewrote query: '{query}' -> '{log_friendly}'")
@@ -207,15 +213,16 @@ If the question is generic, such as "What is a dragon?" or "Tell me about a famo
                 context_str += f"{role}: {content}\n"
 
         prompt = f"""You are a strict topic validator for a fantasy chatbot. Your task is to determine if a user's question can be answered within the context of the selected fantasy universe.
-You must also identify the primary entity (Character, Place, Creature, or Event) the user is asking about so we can search for an image of it later.
+This includes specific lore (characters, places, events) AS WELL AS meta-information about the books, authors, and publication history, or requests for quotes and references from the literature.
 
 Current universe: {universe_name}
 Universe keywords: {keywords}
 {context_str}
 User question: "{query}"
 
-1. Does the user question make sense to answer from the perspective of the {universe_name} universe?
-2. If YES, what is the main specific Entity (Character, Place, Creature, Event) being asked about? (Resolve pronouns using context if needed).
+1. Is this question related to the {universe_name} universe, its lore, its books, its author, or its publication history?
+2. If YES, what is the main specific Entity (Character, Place, Creature, Event) being asked about for image search? (Resolve pronouns using context if needed).
+   Note: For meta-questions or quote requests with no single visual entity, use "none".
 
 If the answer is YES, respond with exactly: true|<Entity Name>
 If there is no specific visualizable entity, respond: true|none
@@ -227,6 +234,18 @@ Examples:
 Universe: Lord of the Rings
 Question: "Who is the Dark Lord?"
 Response: true|Sauron
+
+Universe: Lord of the Rings
+Question: "What are the names of the three books?"
+Response: true|none
+
+Universe: Lord of the Rings
+Question: "What did Gandalf say to Pippin about death?"
+Response: true|Gandalf
+
+Universe: Lord of the Rings
+Question: "Who wrote these books and when?"
+Response: true|none
 
 Universe: Lord of the Rings
 Question: "What is the capital of France?"

@@ -43,9 +43,9 @@ class TopicValidator:
 User asked: "{user_message}"
 Chatbot responded: "{response}"
 
-Evaluate the chatbot's response. Does the response stay entirely within the requested fantasy universe?
-Does it avoid mentioning real-world concepts or other unrelated franchises?
-Respond with ONLY the word "true" if the response is valid and stays in-universe, or "false" if it mentions out-of-universe or real-world concepts. No other text."""
+Evaluate the chatbot's response. Does the response stay within the requested fantasy universe or its related meta-information (books, authors, publication history, or direct quotes/references from the literature)?
+Does it avoid mentioning out-of-universe real-world concepts or other unrelated franchises?
+Respond with ONLY the word "true" if the response is valid and stays in-universe or related meta-context, or "false" if it mentions out-of-universe or real-world concepts. No other text."""
 
         try:
             llm_resp = self.llm_runner.generate_response(
