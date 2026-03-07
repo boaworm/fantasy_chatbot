@@ -138,7 +138,7 @@ universes:
 llm:
   api_url: "http://192.168.1.183:1234/v1"
   model: "local-model"
-  temperature: 0.7
+  temperature: 0.3
   max_tokens: 500
   system_prompt: "You are a helpful assistant specializing in fantasy literature and role-playing games. Answer questions about the topics listed in your system instructions."
 ```
