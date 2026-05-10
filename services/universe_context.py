@@ -3,10 +3,11 @@ Universe context service for fantasy chatbot.
 Handles universe selection and query rewriting.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import logging
 from pydantic import BaseModel
 from services.llm_runner import LLMRunner
+from services.wikipedia_retriever import WikipediaRetriever
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class UniverseContext:
         self.universes = [Universe(**universe) for universe in universes]
         self.current_universe: Optional[Universe] = None
         self.llm_runner = llm_runner
+        self.wikipedia_retriever = WikipediaRetriever()
 
     def get_universe_by_name(self, name: str) -> Optional[Universe]:
         """
@@ -91,23 +93,62 @@ class UniverseContext:
         """
         return self.current_universe
 
-    def rewrite_query(self, query: str) -> str:
+    def is_earth_universe(self) -> bool:
+        """
+        Check if the current universe is Earth.
+
+        Returns:
+            True if Earth universe is selected
+        """
+        return self.current_universe and self.current_universe.name.lower() == "earth"
+
+    def rewrite_query(self, query: str, children_mode: bool = False, wikipedia_context: Optional[Tuple[str, List[Tuple[str, Optional[str]]]]] = None) -> str:
         """
         Rewrite query to include universe context.
 
         Args:
             query: Original user query
+            children_mode: If True, simplify language for children
+            wikipedia_context: Optional tuple of (article_text, entity_image_pairs) from Wikipedia
 
         Returns:
             Rewritten query with universe context
-            The answer may only contain places, names, characters and events from the selected universe.
-            If the question is generic, such as "What is a dragon?", the answer may include information about dragons from this universet
-            If the question is generic, such as "Tell me about a famous character", the answer may include information about a famous character from this universe, but not a generic character that is not related to the universe.      
-                
-          """
+        """
         if not self.current_universe:
             return query
 
+        # Special handling for Earth universe with Wikipedia context
+        if self.is_earth_universe() and wikipedia_context:
+            article_text, entity_images = wikipedia_context
+
+            rewritten = f"""Based on the following Wikipedia information, answer the user's question:
+
+WIKIPEDIA_ARTICLES:
+{article_text}
+
+END_WIKIPEDIA_ARTICLES
+
+USER_QUESTION: {query}
+
+"""
+            if children_mode:
+                rewritten += """INSTRUCTIONS:
+- Rewrite the Wikipedia information to be appropriate for a 7-year-old child
+- Use simple words and short to medium length sentences
+- Explain any difficult concepts in child-friendly terms
+- Make it engaging and fun to read
+"""
+            else:
+                rewritten += """INSTRUCTIONS:
+- Answer the user's question using the Wikipedia information provided
+- Be accurate and informative
+"""
+
+            log_friendly = rewritten.replace('\n', ' ')[:200] + "..."
+            logger.info(f"Rewrote query (Earth/Wikipedia): '{query}' -> '{log_friendly}'")
+            return rewritten
+
+        # Original fantasy universe handling
         rewritten = f"""START_USER_QUESTION {query} END_USER_QUESTION
 
 START_UNIVERSE_CONTEXT
@@ -119,6 +160,9 @@ END_UNIVERSE_CONTEXT
 CRITICAL QUOTE RULES:
 1. Do not present quotes from the literature. You are not capable of quoting accuratenly from the literature.
 """
+
+        if children_mode:
+            rewritten += "\nThis is a story for a child, so use simple words and short to medium length sentences.\n"
 
         log_friendly = rewritten.replace('\n', ' ')
         logger.info(f"Rewrote query: '{query}' -> '{log_friendly}'")

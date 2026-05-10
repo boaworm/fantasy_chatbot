@@ -19,6 +19,7 @@ from services.topic_validator import TopicValidator
 from services.llm_runner import LLMRunner, LLMResponse
 from services.universe_context import UniverseContext
 from services.image_search import WikipediaImageSearch
+from services.wikipedia_retriever import WikipediaRetriever
 
 # Configure logging
 logging.basicConfig(
@@ -67,6 +68,7 @@ topic_validator = TopicValidator(
 
 # Create image searcher and shared thread pool executor
 image_searcher = WikipediaImageSearch()
+wikipedia_retriever = WikipediaRetriever()
 _executor = ThreadPoolExecutor(max_workers=4)
 
 # Path for saving proxied images
@@ -222,7 +224,7 @@ async def chat(request: ChatRequest):
     # Initialize conversation if needed
     if request.conversation_id not in conversations:
         conversations[request.conversation_id] = []
-        
+
     history = conversations[request.conversation_id]
 
     # Validate user message against universe
@@ -236,16 +238,28 @@ async def chat(request: ChatRequest):
             conversation_id=request.conversation_id
         )
 
-    # Rewrite query to include universe context
-    rewritten_query = universe_context.rewrite_query(request.message)
-
-    # If children's book mode is enabled, instruct the LLM to simplify language
-    if request.children_mode:
-        rewritten_query += " This is a story for a child, so use simple words and short to medium length sentences."
-
-    # Get wiki URL for the current universe (before entering the async block)
+    # Get wiki URL for the current universe
     current_universe = universe_context.get_current_universe()
     wiki_api_base = current_universe.wiki_api_base if current_universe else None
+
+    # For Earth universe, fetch Wikipedia articles first
+    wikipedia_context = None
+    if universe_context.is_earth_universe():
+        try:
+            articles = wikipedia_retriever.search_and_fetch(request.message, max_articles=2)
+            if articles:
+                article_text, entity_images = wikipedia_retriever.join_articles(articles)
+                wikipedia_context = (article_text, entity_images)
+                logger.info(f"Fetched {len(articles)} Wikipedia articles for '{request.message}'")
+        except Exception as e:
+            logger.warning(f"Failed to fetch Wikipedia articles: {e}")
+
+    # Rewrite query to include universe context (with Wikipedia context for Earth)
+    rewritten_query = universe_context.rewrite_query(
+        request.message,
+        children_mode=request.children_mode,
+        wikipedia_context=wikipedia_context
+    )
 
     # -------------------------------------------------------------------
     # Parallel execution: start LLM text generation and image search at
@@ -265,29 +279,42 @@ async def chat(request: ChatRequest):
             )
 
         async def run_image_search():
+            # For Earth universe, use images from Wikipedia articles
+            if universe_context.is_earth_universe() and wikipedia_context:
+                _, entity_images = wikipedia_context
+                if entity_images:
+                    # Use the first entity's image
+                    entity_name, image_url = entity_images[0]
+                    if image_url:
+                        logger.info(f"Using Wikipedia image for '{entity_name}': {image_url}")
+                        local_filename = image_searcher.download_image(image_url, str(IMAGE_SAVE_DIR))
+                        return local_filename, entity_name
+                return None, None
+
+            # For fantasy universes, use the original image search
             if not extracted_entity:
-                return None
+                return None, None
             logger.info(f"Searching image for '{extracted_entity}' on {wiki_api_base or 'Wikipedia'}")
-            
+
             # Step 1: Get the remote URL
             remote_url = await loop.run_in_executor(
                 _executor,
                 lambda: image_searcher.get_image_url(extracted_entity, request.universe, wiki_api_base)
             )
-            
+
             if not remote_url:
-                return None
-                
+                return None, None
+
             # Step 2: Download locally to bypass hotlink protection
             local_filename = await loop.run_in_executor(
                 _executor,
                 lambda: image_searcher.download_image(remote_url, str(IMAGE_SAVE_DIR))
             )
-            
-            return local_filename
+
+            return local_filename, extracted_entity
 
         # Fire both off at the same time
-        llm_response, image_filename = await asyncio.gather(run_llm(), run_image_search())
+        llm_response, (image_filename, image_entity) = await asyncio.gather(run_llm(), run_image_search())
 
         # Clean the response to remove analysis steps and formatting
         cleaned_response = clean_llm_response(llm_response.content)
@@ -310,10 +337,11 @@ async def chat(request: ChatRequest):
         if image_filename:
             image_path = f"/static/images/{image_filename}"
             logger.info(f"Embedding local image: {image_path}")
+            entity_name = image_entity or extracted_entity or "this topic"
             final_answer = f"""
 <div class="entity-illustration-container">
-    <img src="{image_path}" alt="Illustration of {extracted_entity}" class="entity-illustration">
-    <div class="entity-caption">{extracted_entity}</div>
+    <img src="{image_path}" alt="Illustration of {entity_name}" class="entity-illustration">
+    <div class="entity-caption">{entity_name}</div>
 </div>
 {final_answer}
 """

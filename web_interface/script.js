@@ -357,6 +357,13 @@ universeSelect.addEventListener('change', (e) => {
     currentUniverse = e.target.value;
     startChatButton.disabled = !currentUniverse;
     messageInput.placeholder = `Ask about ${currentUniverse || 'your selected universe'}...`;
+
+    // Auto-check children's book checkbox for Earth universe
+    if (currentUniverse && currentUniverse.toLowerCase() === 'earth') {
+        childrensBookCheckbox.checked = true;
+    } else {
+        childrensBookCheckbox.checked = false;
+    }
 });
 
 // Check API health on load
