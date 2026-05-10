@@ -204,7 +204,37 @@ CRITICAL QUOTE RULES:
         if not self.current_universe:
             return False, "No universe selected", None
 
-        # If LLM is available, use it to determine if the topic is related
+        # For Earth universe, be very permissive - accept almost any query
+        # since Earth (real world) can answer questions about anything
+        if self.is_earth_universe():
+            # First try keyword matching
+            query_lower = query.lower()
+            for keyword in self.current_universe.keywords:
+                if keyword.lower() in query_lower:
+                    return True, f"Related to {self.current_universe.name}", None
+            
+            # Check for universe name
+            if self.current_universe.name.lower() in query_lower:
+                return True, f"Related to {self.current_universe.name}", None
+            
+            # For Earth, accept most queries - just do a quick sanity check
+            # that the query isn't completely nonsense
+            if len(query.strip()) > 3 and '?' in query:
+                return True, f"Related to {self.current_universe.name}", None
+            
+            # If keyword matching fails and query seems odd, fall back to LLM
+            # but with a very short timeout
+            if self.llm_runner:
+                try:
+                    is_related, reason, entity = self._check_topic_with_llm(query, history)
+                    return is_related, reason, entity
+                except Exception as e:
+                    logger.warning(f"LLM validation failed for Earth: {e}, accepting query")
+                    return True, f"Related to {self.current_universe.name}", None
+            
+            return True, f"Related to {self.current_universe.name}", None
+
+        # For fantasy universes, use strict LLM validation
         if self.llm_runner:
             try:
                 is_related, reason, entity = self._check_topic_with_llm(query, history)

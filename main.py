@@ -319,10 +319,10 @@ async def chat(request: ChatRequest):
         # Clean the response to remove analysis steps and formatting
         cleaned_response = clean_llm_response(llm_response.content)
 
-        # Validate LLM response
+        # Validate LLM response - use original message, not rewritten query
         is_response_valid, response_reason = topic_validator.validate_response(
             cleaned_response,
-            rewritten_query
+            request.message  # Use original user message, not rewritten_query with Wikipedia content
         )
 
         if not is_response_valid:

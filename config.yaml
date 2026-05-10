@@ -113,9 +113,9 @@ universes:
 # LLM Configuration
 llm:
   # OpenAI-compatible API endpoint (base URL, SDK will add /chat/completions)
-  api_url: "http://192.168.1.183:1234/v1"
+  api_url: "https://www.thorburn.se/llama/"
   # Model name
-  model: "local-model"
+  model: "qwen-henrik"
   # Temperature for response generation (0.0-2.0)
   temperature: 0.3
   # Maximum tokens in response
