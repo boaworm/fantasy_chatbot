@@ -120,7 +120,14 @@ class WikipediaImageSearch:
 
             # Download the image
             logger.info(f"Downloading image from {url} to {filepath}")
-            response = self.session.get(url, timeout=15)
+            
+            # Use a separate requests.get() with browser headers for image downloads
+            # to avoid 403 errors from Wikimedia (which blocks bot User-Agents)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0',
+                'Referer': 'https://en.wikipedia.org/'
+            }
+            response = requests.get(url, headers=headers, timeout=15)
             response.raise_for_status()
 
             with open(filepath, 'wb') as f:

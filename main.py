@@ -243,14 +243,30 @@ async def chat(request: ChatRequest):
     wiki_api_base = current_universe.wiki_api_base if current_universe else None
 
     # For Earth universe, fetch Wikipedia articles first
+    # First, resolve pronouns in the query using conversation history
     wikipedia_context = None
     if universe_context.is_earth_universe():
+        # Build search query, resolving pronouns if needed
+        search_query = request.message
+        if request.conversation_id and request.conversation_id in conversations:
+            history = conversations[request.conversation_id]
+            # Check if the message contains pronouns that need resolution
+            pronouns = ['he', 'she', 'it', 'they', 'his', 'her', 'their', 'this', 'that']
+            if any(p in request.message.lower().split() for p in pronouns):
+                # Find the last user message to get context
+                last_user_msg = next(
+                    (m['content'] for m in reversed(history) if m['role'] == 'user'),
+                    None
+                )
+                if last_user_msg:
+                    search_query = f"{last_user_msg} {request.message}"
+        
         try:
-            articles = wikipedia_retriever.search_and_fetch(request.message, max_articles=2)
+            articles = wikipedia_retriever.search_and_fetch(search_query, max_articles=2)
             if articles:
                 article_text, entity_images = wikipedia_retriever.join_articles(articles)
                 wikipedia_context = (article_text, entity_images)
-                logger.info(f"Fetched {len(articles)} Wikipedia articles for '{request.message}'")
+                logger.info(f"Fetched {len(articles)} Wikipedia articles for '{search_query}'")
         except Exception as e:
             logger.warning(f"Failed to fetch Wikipedia articles: {e}")
 
